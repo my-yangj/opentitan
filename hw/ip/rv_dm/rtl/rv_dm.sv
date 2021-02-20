@@ -20,7 +20,7 @@ module rv_dm #(
   input  logic                rst_ni,      // asynchronous reset active low, connect PoR
                                           // here, not the system reset
   input  lc_ctrl_pkg::lc_tx_t hw_debug_en_i,
-  input  logic                testmode_i,
+  input  lc_ctrl_pkg::lc_tx_t scanmode_i,
   output logic                ndmreset_o,  // non-debug module reset
   output logic                dmactive_o,  // debug module is active
   output logic [NrHarts-1:0]  debug_req_o, // async debug request
@@ -87,6 +87,10 @@ module rv_dm #(
   logic dmi_req_valid, dmi_req_ready;
   logic dmi_rsp_valid, dmi_rsp_ready;
   logic dmi_rst_n;
+  logic testmode;
+
+  // Decode multibit scanmode enable
+  assign testmode = (scanmode_i == lc_ctrl_pkg::On);
 
   // static debug hartinfo
   localparam dm::hartinfo_t DebugHartInfo = '{
@@ -108,7 +112,7 @@ module rv_dm #(
   ) i_dm_csrs (
     .clk_i                   ( clk_i                 ),
     .rst_ni                  ( rst_ni                ),
-    .testmode_i              ( testmode_i            ),
+    .testmode_i              ( testmode              ),
     .dmi_rst_ni              ( dmi_rst_n             ),
     .dmi_req_valid_i         ( dmi_req_valid         ),
     .dmi_req_ready_o         ( dmi_req_ready         ),
@@ -273,13 +277,24 @@ module rv_dm #(
 
   // Bound-in DPI module replaces the TAP
 `ifndef DMIDirectTAP
+
+  logic tck_muxed;
+  prim_clock_mux2 #(
+    .NoFpgaBufG(1'b1)
+  ) u_prim_clock_mux2 (
+    .clk0_i(jtag_req_i.tck),
+    .clk1_i(clk_i),
+    .sel_i (testmode),
+    .clk_o (tck_muxed)
+  );
+
   // JTAG TAP
   dmi_jtag #(
     .IdcodeValue    (IdcodeValue)
   ) dap (
     .clk_i            (clk_i),
     .rst_ni           (rst_ni),
-    .testmode_i       (testmode_i),
+    .testmode_i       (testmode),
 
     .dmi_rst_no       (dmi_rst_n),
     .dmi_req_o        (dmi_req),
@@ -291,7 +306,7 @@ module rv_dm #(
     .dmi_resp_valid_i (dmi_rsp_valid),
 
     //JTAG
-    .tck_i            (jtag_req_i.tck),
+    .tck_i            (tck_muxed),
     .tms_i            (jtag_req_i.tms),
     .trst_ni          (jtag_req_i.trst_n),
     .td_i             (jtag_req_i.tdi),

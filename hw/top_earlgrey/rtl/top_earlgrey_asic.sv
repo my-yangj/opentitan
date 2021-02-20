@@ -4,10 +4,7 @@
 
 module top_earlgrey_asic (
   // Clock and Reset
-  // TODO: remove the IO_CLK port once AST contains an oscillator model. a calibration clock
-  // will then be muxed in via another port.
-  inout               IO_CLK,
-  inout               IO_RST_N,
+  inout               POR_N,
   // Bank A (VIOA domain)
   inout               SPI_HOST_D0,
   inout               SPI_HOST_D1,
@@ -90,7 +87,7 @@ module top_earlgrey_asic (
   // Padring Instance //
   //////////////////////
 
-  logic clk, rst_n;
+  logic rst_n;
   logic [pinmux_reg_pkg::NMioPads-1:0][pinmux_reg_pkg::AttrDw-1:0] mio_attr;
   logic [pinmux_reg_pkg::NDioPads-1:0][pinmux_reg_pkg::AttrDw-1:0] dio_attr;
   logic [pinmux_reg_pkg::NMioPads-1:0] mio_out_core, mio_out_padring;
@@ -106,8 +103,12 @@ module top_earlgrey_asic (
   wire unused_usbdev_d, unused_usbdev_aon_sense;
   wire unused_usbdev_dp_pullup_en, unused_usbdev_dn_pullup_en;
   wire unused_spi_device_s2, unused_spi_device_s3;
+  wire unused_clk;
 
   padring #(
+    // The clock pad is not connected since
+    // AST contains an internal oscillator model.
+    .ConnectClk ( 0 ),
     // All MIOs are connected
     .ConnectMioIn  ( 44'hFFF_FFFF_FFFF ),
     .ConnectMioOut ( 44'hFFF_FFFF_FFFF ),
@@ -190,12 +191,12 @@ module top_earlgrey_asic (
                       } )
   ) u_padring (
     // Clk / Rst
-    .clk_pad_i           ( IO_CLK           ),
-    .rst_pad_ni          ( IO_RST_N         ),
-    .clk_o               ( clk              ),
-    .rst_no              ( rst_n            ),
-    .cc1_i               ( CC1              ),
-    .cc2_i               ( CC2              ),
+    .clk_pad_i           ( unused_clk ),
+    .rst_pad_ni          ( POR_N      ),
+    .clk_o               (            ),
+    .rst_no              ( rst_n      ),
+    .cc1_i               ( CC1        ),
+    .cc2_i               ( CC2        ),
     // "special"
     // MIO Pads
     .mio_pad_io          ( { // RBox
@@ -386,7 +387,7 @@ module top_earlgrey_asic (
   ast_pkg::ast_status_t ast_status;
 
   // ast clocks and resets
-  ast_pkg::ast_rst_t ast_base_rst;
+  logic aon_pok;
   ast_pkg::ast_clks_t ast_base_clks;
 
   // pwrmgr interface
@@ -452,6 +453,10 @@ module top_earlgrey_asic (
   import rstmgr_pkg::DomainAonSel;
   import rstmgr_pkg::Domain0Sel;
 
+  // TODO: need to mux the external clock.
+  logic ext_clk;
+  assign ext_clk = 1'b0;
+
   ast #(
     .EntropyStreams(top_pkg::ENTROPY_STREAM),
     .AdcChannels(top_pkg::ADC_CHANNELS),
@@ -477,7 +482,7 @@ module top_earlgrey_asic (
     .rst_ast_tlul_ni       ( rsts_ast.rst_ast_sensor_ctrl_aon_sys_io_div4_n[DomainAonSel] ),
     .clk_ast_usb_i         ( clks_ast.clk_ast_usbdev_usb_peri ),
     .rst_ast_usb_ni        ( rsts_ast.rst_ast_usbdev_usb_n[Domain0Sel] ),
-    .clk_ast_ext_i         ( clk ),
+    .clk_ast_ext_i         ( ext_clk ),
     .por_ni                ( rst_n ),
     // pok test for FPGA
     .vcc_supp_i            ( 1'b1 ),
@@ -486,7 +491,7 @@ module top_earlgrey_asic (
     .vioa_supp_i           ( 1'b1 ),
     .viob_supp_i           ( 1'b1 ),
     // pok
-    .vcaon_pok_o           ( ast_base_rst.aon_pok ),
+    .vcaon_pok_o           ( aon_pok ),
     .vcmain_pok_o          ( ast_base_pwr.main_pok ),
     .vioa_pok_o            ( ast_status.io_pok[0] ),
     .viob_pok_o            ( ast_status.io_pok[1] ),
@@ -596,7 +601,7 @@ module top_earlgrey_asic (
     .KmacEnMasking(1),  // DOM AND + Masking scheme
     .KmacReuseShare(0)
   ) top_earlgrey (
-    .rst_ni                       ( rst_n                      ),
+    .rst_ni                       ( aon_pok                    ),
     // ast connections
     .clk_main_i                   ( ast_base_clks.clk_sys      ),
     .clk_io_i                     ( ast_base_clks.clk_io       ),
@@ -604,7 +609,6 @@ module top_earlgrey_asic (
     .clk_aon_i                    ( ast_base_clks.clk_aon      ),
     .clks_ast_o                   ( clks_ast                   ),
     .clk_main_jitter_en_o         ( jen                        ),
-    .rstmgr_ast_i                 ( ast_base_rst               ),
     .rsts_ast_o                   ( rsts_ast                   ),
     .pwrmgr_ast_req_o             ( base_ast_pwr               ),
     .pwrmgr_ast_rsp_i             ( ast_base_pwr               ),

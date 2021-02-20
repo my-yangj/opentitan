@@ -92,7 +92,6 @@ module top_englishbreakfast_verilator (
 
   // dummy ast connections
   pwrmgr_pkg::pwr_ast_rsp_t ast_base_pwr;
-  ast_pkg::ast_rst_t ast_base_rst;
   ast_pkg::ast_alert_req_t ast_base_alerts;
   ast_pkg::ast_status_t ast_base_status;
 
@@ -109,18 +108,33 @@ module top_englishbreakfast_verilator (
   assign ast_base_alerts.alerts = {ast_pkg::NumAlerts{silent_alert}};
   assign ast_base_status.io_pok    = {ast_pkg::NumIoRails{1'b1}};
 
+  logic clk_aon;
+  // reset is not used below becuase verilator uses only sync resets
+  // and also does not under 'x'.
+  // if we allow the divider below to reset, clk_aon will be silenced,
+  // and as a result all the clk_aon logic inside top_earlgrey does not
+  // get reset
+  prim_clock_div #(
+    .Divisor(4)
+  ) u_aon_div (
+    .clk_i,
+    .rst_ni(1'b1),
+    .step_down_req_i('0),
+    .step_down_ack_o(),
+    .test_en_i('0),
+    .clk_o(clk_aon)
+  );
+
   // the rst_ni pin only goes to AST
   // the rest of the logic generates reset based on the 'pok' signal.
   // for verilator purposes, make these two the same.
-  assign ast_base_rst.aon_pok      = rst_ni;
   // Top-level design
   top_englishbreakfast top_englishbreakfast (
     .rst_ni                     (rst_ni),
     .clk_main_i                 (clk_i),
     .clk_io_i                   (clk_i),
     .clk_usb_i                  (clk_i),
-    .clk_aon_i                  (clk_i),
-    .rstmgr_ast_i               ( ast_base_rst    ),
+    .clk_aon_i                  (clk_aon),
     .pwrmgr_ast_req_o           (                 ),
     .pwrmgr_ast_rsp_i           ( ast_base_pwr    ),
     .sensor_ctrl_ast_alert_req_i  ( ast_base_alerts ),

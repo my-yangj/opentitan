@@ -19,7 +19,7 @@ module top_earlgrey #(
   parameter bit SecAesAllowForcingMasks = 1'b0,
   parameter bit KmacEnMasking = 0,
   parameter int KmacReuseShare = 0,
-  parameter aes_pkg::sbox_impl_e CsrngSBoxImpl = aes_pkg::SBoxImplLut,
+  parameter aes_pkg::sbox_impl_e CsrngSBoxImpl = aes_pkg::SBoxImplCanright,
   parameter bit SramCtrlMainInstrExec = 1,
   parameter otbn_pkg::regfile_e OtbnRegFile = otbn_pkg::RegFileFF,
 
@@ -61,7 +61,6 @@ module top_earlgrey #(
   input  logic       clk_usb_i,
   input  logic       clk_aon_i,
   output logic       clk_main_jitter_en_o,
-  input  rstmgr_pkg::rstmgr_ast_t       rstmgr_ast_i,
   output pwrmgr_pkg::pwr_ast_req_t       pwrmgr_ast_req_o,
   input  pwrmgr_pkg::pwr_ast_rsp_t       pwrmgr_ast_rsp_i,
   input  ast_pkg::ast_alert_req_t       sensor_ctrl_ast_alert_req_i,
@@ -88,7 +87,7 @@ module top_earlgrey #(
   output rstmgr_pkg::rstmgr_ast_out_t       rsts_ast_o,
   input                      scan_rst_ni, // reset used for test mode
   input                      scan_en_i,
-  input lc_ctrl_pkg::lc_tx_t scanmode_i   // 1 for Scan
+  input lc_ctrl_pkg::lc_tx_t scanmode_i   // lc_ctrl_pkg::On for Scan
 );
 
   // JTAG IDCODE for development versions of this code.
@@ -370,11 +369,11 @@ module top_earlgrey #(
   logic intr_csrng_cs_fatal_err;
   logic intr_entropy_src_es_entropy_valid;
   logic intr_entropy_src_es_health_test_failed;
-  logic intr_entropy_src_es_fifo_err;
+  logic intr_entropy_src_es_fatal_err;
   logic intr_edn0_edn_cmd_req_done;
-  logic intr_edn0_edn_fifo_err;
+  logic intr_edn0_edn_fatal_err;
   logic intr_edn1_edn_cmd_req_done;
-  logic intr_edn1_edn_fifo_err;
+  logic intr_edn1_edn_fatal_err;
   logic intr_otbn_done;
 
 
@@ -441,6 +440,8 @@ module top_earlgrey #(
   keymgr_pkg::kmac_data_req_t       keymgr_kmac_data_req;
   keymgr_pkg::kmac_data_rsp_t       keymgr_kmac_data_rsp;
   logic [3:0] clkmgr_aon_idle;
+  jtag_pkg::jtag_req_t       pinmux_aon_lc_jtag_req;
+  jtag_pkg::jtag_rsp_t       pinmux_aon_lc_jtag_rsp;
   otp_ctrl_pkg::otp_lc_data_t       otp_ctrl_otp_lc_data;
   otp_ctrl_pkg::lc_otp_program_req_t       lc_ctrl_lc_otp_program_req;
   otp_ctrl_pkg::lc_otp_program_rsp_t       lc_ctrl_lc_otp_program_rsp;
@@ -562,15 +563,12 @@ module top_earlgrey #(
   assign ast_edn_edn_rsp_o = edn0_edn_rsp[2];
 
   // define partial inter-module tie-off
-  edn_pkg::edn_rsp_t unused_edn1_edn_rsp1;
   edn_pkg::edn_rsp_t unused_edn1_edn_rsp2;
   edn_pkg::edn_rsp_t unused_edn1_edn_rsp3;
 
   // assign partial inter-module tie-off
-  assign unused_edn1_edn_rsp1 = edn1_edn_rsp[1];
   assign unused_edn1_edn_rsp2 = edn1_edn_rsp[2];
   assign unused_edn1_edn_rsp3 = edn1_edn_rsp[3];
-  assign edn1_edn_req[1] = '0;
   assign edn1_edn_req[2] = '0;
   assign edn1_edn_req[3] = '0;
 
@@ -688,7 +686,7 @@ module top_earlgrey #(
     .clk_i         (clkmgr_aon_clocks.clk_proc_main),
     .rst_ni        (rstmgr_aon_resets.rst_lc_n[rstmgr_pkg::Domain0Sel]),
     .hw_debug_en_i (lc_ctrl_lc_hw_debug_en),
-    .testmode_i    (1'b0),
+    .scanmode_i,
     .ndmreset_o    (ndmreset_req),
     .dmactive_o    (),
     .debug_req_o   (debug_req),
@@ -1087,11 +1085,12 @@ module top_earlgrey #(
       // Inter-module signals
       .tl_i(spi_device_tl_req),
       .tl_o(spi_device_tl_rsp),
-      .scanmode_i   (scanmode_i),
+      .scanmode_i,
       .scan_rst_ni  (scan_rst_ni),
 
       // Clock and reset connections
       .clk_i (clkmgr_aon_clocks.clk_io_div4_peri),
+      .scan_clk_i (clkmgr_aon_clocks.clk_io_div2_peri),
       .rst_ni (rstmgr_aon_resets.rst_spi_device_n[rstmgr_pkg::Domain0Sel])
   );
 
@@ -1111,7 +1110,7 @@ module top_earlgrey #(
       // Inter-module signals
       .tl_i(spi_host0_tl_req),
       .tl_o(spi_host0_tl_rsp),
-      .scanmode_i   (scanmode_i),
+      .scanmode_i,
 
       // Clock and reset connections
       .clk_i (clkmgr_aon_clocks.clk_io_div4_peri),
@@ -1134,7 +1133,7 @@ module top_earlgrey #(
       // Inter-module signals
       .tl_i(spi_host1_tl_req),
       .tl_o(spi_host1_tl_rsp),
-      .scanmode_i   (scanmode_i),
+      .scanmode_i,
 
       // Clock and reset connections
       .clk_i (clkmgr_aon_clocks.clk_io_div4_peri),
@@ -1423,8 +1422,8 @@ module top_earlgrey #(
       .alert_rx_i  ( alert_rx[3:2] ),
 
       // Inter-module signals
-      .jtag_i(jtag_pkg::JTAG_REQ_DEFAULT),
-      .jtag_o(),
+      .jtag_i(pinmux_aon_lc_jtag_req),
+      .jtag_o(pinmux_aon_lc_jtag_rsp),
       .esc_wipe_secrets_tx_i(alert_handler_esc_tx[1]),
       .esc_wipe_secrets_rx_o(alert_handler_esc_rx[1]),
       .esc_scrap_state_tx_i(alert_handler_esc_tx[2]),
@@ -1457,7 +1456,7 @@ module top_earlgrey #(
       .otp_hw_cfg_i(otp_ctrl_otp_hw_cfg),
       .tl_i(lc_ctrl_tl_req),
       .tl_o(lc_ctrl_tl_rsp),
-      .scanmode_i   (scanmode_i),
+      .scanmode_i,
 
       // Clock and reset connections
       .clk_i (clkmgr_aon_clocks.clk_io_div4_timers),
@@ -1533,14 +1532,13 @@ module top_earlgrey #(
       .pwr_i(pwrmgr_aon_pwr_rst_req),
       .pwr_o(pwrmgr_aon_pwr_rst_rsp),
       .resets_o(rstmgr_aon_resets),
-      .ast_i(rstmgr_ast_i),
       .cpu_i(rstmgr_aon_cpu),
       .alert_dump_i(alert_handler_crashdump),
       .cpu_dump_i(rv_core_ibex_crashdump),
       .resets_ast_o(rsts_ast_o),
       .tl_i(rstmgr_aon_tl_req),
       .tl_o(rstmgr_aon_tl_rsp),
-      .scanmode_i   (scanmode_i),
+      .scanmode_i,
       .scan_rst_ni  (scan_rst_ni),
 
       // Clock and reset connections
@@ -1571,7 +1569,7 @@ module top_earlgrey #(
       .idle_i(clkmgr_aon_idle),
       .tl_i(clkmgr_aon_tl_req),
       .tl_o(clkmgr_aon_tl_rsp),
-      .scanmode_i   (scanmode_i),
+      .scanmode_i,
 
       // Clock and reset connections
       .clk_i (clkmgr_aon_clocks.clk_io_div4_powerup),
@@ -1586,10 +1584,17 @@ module top_earlgrey #(
   pinmux u_pinmux_aon (
 
       // Inter-module signals
-      .lc_pinmux_strap_i('0),
-      .lc_pinmux_strap_o(),
+      .lc_hw_debug_en_i(lc_ctrl_lc_hw_debug_en),
+      .lc_dft_en_i(lc_ctrl_lc_dft_en),
+      .lc_jtag_o(pinmux_aon_lc_jtag_req),
+      .lc_jtag_i(pinmux_aon_lc_jtag_rsp),
+      .rv_jtag_o(),
+      .rv_jtag_i(jtag_pkg::JTAG_RSP_DEFAULT),
+      .dft_jtag_o(),
+      .dft_jtag_i(jtag_pkg::JTAG_RSP_DEFAULT),
       .dft_strap_test_o(),
       .sleep_en_i(1'b0),
+      .strap_en_i(1'b0),
       .aon_wkup_req_o(pwrmgr_aon_wakeups[0]),
       .usb_wkup_req_o(pwrmgr_aon_wakeups[1]),
       .usb_out_of_rst_i(usbdev_usb_out_of_rst),
@@ -1915,11 +1920,12 @@ module top_earlgrey #(
       // Interrupt
       .intr_es_entropy_valid_o      (intr_entropy_src_es_entropy_valid),
       .intr_es_health_test_failed_o (intr_entropy_src_es_health_test_failed),
-      .intr_es_fifo_err_o           (intr_entropy_src_es_fifo_err),
+      .intr_es_fatal_err_o          (intr_entropy_src_es_fatal_err),
 
-      // [20]: recov_alert_count_met
-      .alert_tx_o  ( alert_tx[20:20] ),
-      .alert_rx_i  ( alert_rx[20:20] ),
+      // [20]: recov_alert
+      // [21]: fatal_alert
+      .alert_tx_o  ( alert_tx[21:20] ),
+      .alert_rx_i  ( alert_rx[21:20] ),
 
       // Inter-module signals
       .entropy_src_hw_if_i(csrng_entropy_src_hw_if_req),
@@ -1941,7 +1947,11 @@ module top_earlgrey #(
 
       // Interrupt
       .intr_edn_cmd_req_done_o (intr_edn0_edn_cmd_req_done),
-      .intr_edn_fifo_err_o     (intr_edn0_edn_fifo_err),
+      .intr_edn_fatal_err_o    (intr_edn0_edn_fatal_err),
+
+      // [22]: fatal_alert
+      .alert_tx_o  ( alert_tx[22:22] ),
+      .alert_rx_i  ( alert_rx[22:22] ),
 
       // Inter-module signals
       .csrng_cmd_o(csrng_csrng_cmd_req[0]),
@@ -1960,7 +1970,11 @@ module top_earlgrey #(
 
       // Interrupt
       .intr_edn_cmd_req_done_o (intr_edn1_edn_cmd_req_done),
-      .intr_edn_fifo_err_o     (intr_edn1_edn_fifo_err),
+      .intr_edn_fatal_err_o    (intr_edn1_edn_fatal_err),
+
+      // [23]: fatal_alert
+      .alert_tx_o  ( alert_tx[23:23] ),
+      .alert_rx_i  ( alert_rx[23:23] ),
 
       // Inter-module signals
       .csrng_cmd_o(csrng_csrng_cmd_req[1]),
@@ -1981,9 +1995,9 @@ module top_earlgrey #(
     .InstrExec(SramCtrlMainInstrExec)
   ) u_sram_ctrl_main (
 
-      // [21]: fatal_parity_error
-      .alert_tx_o  ( alert_tx[21:21] ),
-      .alert_rx_i  ( alert_rx[21:21] ),
+      // [24]: fatal_parity_error
+      .alert_tx_o  ( alert_tx[24:24] ),
+      .alert_rx_i  ( alert_rx[24:24] ),
 
       // Inter-module signals
       .sram_otp_key_o(otp_ctrl_sram_otp_key_req[0]),
@@ -2011,31 +2025,35 @@ module top_earlgrey #(
       // Interrupt
       .intr_done_o (intr_otbn_done),
 
-      // [22]: fatal
-      // [23]: recov
-      .alert_tx_o  ( alert_tx[23:22] ),
-      .alert_rx_i  ( alert_rx[23:22] ),
+      // [25]: fatal
+      // [26]: recov
+      .alert_tx_o  ( alert_tx[26:25] ),
+      .alert_rx_i  ( alert_rx[26:25] ),
 
       // Inter-module signals
+      .edn_o(edn1_edn_req[1]),
+      .edn_i(edn1_edn_rsp[1]),
       .idle_o(clkmgr_aon_idle[3]),
       .tl_i(otbn_tl_req),
       .tl_o(otbn_tl_rsp),
 
       // Clock and reset connections
       .clk_i (clkmgr_aon_clocks.clk_main_otbn),
-      .rst_ni (rstmgr_aon_resets.rst_sys_n[rstmgr_pkg::Domain0Sel])
+      .clk_edn_i (clkmgr_aon_clocks.clk_main_otbn),
+      .rst_ni (rstmgr_aon_resets.rst_sys_n[rstmgr_pkg::Domain0Sel]),
+      .rst_edn_ni (rstmgr_aon_resets.rst_sys_n[rstmgr_pkg::Domain0Sel])
   );
 
   // interrupt assignments
   assign intr_vector = {
-      intr_entropy_src_es_fifo_err, // ID 139
+      intr_entropy_src_es_fatal_err, // ID 139
       intr_entropy_src_es_health_test_failed, // ID 138
       intr_entropy_src_es_entropy_valid, // ID 137
       intr_aon_timer_aon_wdog_timer_bark, // ID 136
       intr_aon_timer_aon_wkup_timer_expired, // ID 135
-      intr_edn1_edn_fifo_err, // ID 134
+      intr_edn1_edn_fatal_err, // ID 134
       intr_edn1_edn_cmd_req_done, // ID 133
-      intr_edn0_edn_fifo_err, // ID 132
+      intr_edn0_edn_fatal_err, // ID 132
       intr_edn0_edn_cmd_req_done, // ID 131
       intr_csrng_cs_fatal_err, // ID 130
       intr_csrng_cs_hw_inst_exc, // ID 129

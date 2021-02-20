@@ -9,6 +9,7 @@ from .html_helpers import expand_paras, render_td
 
 from .multi_register import MultiRegister
 from .register import Register
+from .window import Window
 
 
 def genout(outfile, msg):
@@ -154,8 +155,8 @@ def gen_html_register(outfile, reg, comp, width, rnames, toc, toclvl):
                    wen=regwen_div))
     if desc_body:
         genout(outfile,
-               '<tr><td colspan=5><p>{}</p></td></tr>'
-               .format('</p><p>'.join(desc_body)))
+               '<tr><td colspan=5>{}</td></tr>'
+               .format(''.join(desc_body)))
 
     if toc is not None:
         toc.append((toclvl, comp + "." + rname, "Reg_" + rname.lower()))
@@ -191,24 +192,31 @@ def gen_html_register(outfile, reg, comp, width, rnames, toc, toclvl):
             ('x' if field.resval is None else hex(field.resval)) +
             "</td>")
         genout(outfile, "<td class=\"regfn\">" + fname + "</td>")
+
+        # Collect up any description and enum table
+        desc_parts = []
+
         if field.desc is not None:
-            genout(outfile, render_td(field.desc, rnames, 'regde'))
-        else:
-            genout(outfile, "<td>\n")
+            desc_parts += expand_paras(field.desc, rnames)
 
         if field.enum is not None:
-            genout(outfile, "    <table>")
+            desc_parts.append('<table>')
             for enum in field.enum:
-                ename = enum.name
-                genout(outfile, "    <tr><td>" + str(enum.value) + "</td>")
-                genout(outfile, "<td>" + ename + "</td>")
-                genout(outfile, render_td(enum.desc, rnames, None))
-                genout(outfile, "</tr>\n")
-
-            genout(outfile, "    </table>")
+                enum_desc_paras = expand_paras(enum.desc, rnames)
+                desc_parts.append('<tr>'
+                                  '<td>{val}</td>'
+                                  '<td>{name}</td>'
+                                  '<td>{desc}</td>'
+                                  '</tr>\n'
+                                  .format(val=enum.value,
+                                          name=enum.name,
+                                          desc=''.join(enum_desc_paras)))
+            desc_parts.append('</table>')
             if field.has_incomplete_enum():
-                genout(outfile, "Other values are reserved.")
-        genout(outfile, "</td></tr>\n")
+                desc_parts.append("<p>Other values are reserved.</p>")
+
+        genout(outfile,
+               '<td class="regde">{}</td>'.format(''.join(desc_parts)))
         nextbit = fieldlsb + field.bits.width()
 
     genout(outfile, "</table>\n<br>\n")
@@ -217,18 +225,27 @@ def gen_html_register(outfile, reg, comp, width, rnames, toc, toclvl):
 
 
 def gen_html_window(outfile, win, comp, regwidth, rnames, toc, toclvl):
-    wname = win['name']
-    offset = win['genoffset']
-    genout(
-        outfile, '<table class="regdef" id="Reg_' + wname.lower() + '">\n'
-        '<tr><th class="regdef"><div>' + comp + '.' + wname + ' @ + ' +
-        hex(offset) + '</div><div>' + win['items'] + ' item ' +
-        win['swaccess'] + ' window</div><div>Byte writes are ' +
-        ('' if win['genbyte-write'] else '<i>not</i> ') +
-        'supported</div></th></tr>\n')
+    wname = win.name or '(unnamed window)'
+    offset = win.offset
+    genout(outfile,
+           '<table class="regdef" id="Reg_{lwname}">\n'
+           '  <tr>\n'
+           '    <th class="regdef">\n'
+           '      <div>{comp}.{wname} @ + {off:#x}</div>\n'
+           '      <div>{items} item {swaccess} window</div>\n'
+           '      <div>Byte writes are {byte_writes}supported</div>\n'
+           '    </th>\n'
+           '  </tr>\n'
+           .format(comp=comp,
+                   wname=wname,
+                   lwname=wname.lower(),
+                   off=offset,
+                   items=win.items,
+                   swaccess=win.swaccess.key,
+                   byte_writes=('' if win.byte_write else '<i>not</i> ')))
     genout(outfile, '<tr><td><table class="regpic">')
     genout(outfile, '<tr><td width="10%"></td>')
-    wid = win['genvalidbits']
+    wid = win.validbits
 
     for x in range(regwidth - 1, -1, -1):
         if x == regwidth - 1 or x == wid - 1 or x == 0:
@@ -236,7 +253,7 @@ def gen_html_window(outfile, win, comp, regwidth, rnames, toc, toclvl):
         else:
             genout(outfile, '<td class="bitnum"></td>')
     genout(outfile, '</tr>')
-    tblmax = int(win['items']) - 1
+    tblmax = win.items - 1
     for x in [0, 1, 2, tblmax - 1, tblmax]:
         if x == 2:
             genout(
@@ -260,7 +277,7 @@ def gen_html_window(outfile, win, comp, regwidth, rnames, toc, toclvl):
             genout(outfile, '</tr>')
     genout(outfile, '</td></tr></table>')
     genout(outfile,
-           '<tr>{}</tr>'.format(render_td(win['desc'], rnames, 'regde')))
+           '<tr>{}</tr>'.format(render_td(win.desc, rnames, 'regde')))
     genout(outfile, "</table>\n<br>\n")
     if toc is not None:
         toc.append((toclvl, comp + "." + wname, "Reg_" + wname.lower()))
@@ -289,10 +306,8 @@ def gen_html(regs, outfile, toclist=None, toclevel=3):
                 gen_html_register(outfile, reg, component, regwidth, rnames,
                                   toclist, toclevel)
             continue
-
-        assert isinstance(x, dict)
-        if 'window' in x:
-            gen_html_window(outfile, x['window'], component, regwidth, rnames,
+        if isinstance(x, Window):
+            gen_html_window(outfile, x, component, regwidth, rnames,
                             toclist, toclevel)
             continue
 

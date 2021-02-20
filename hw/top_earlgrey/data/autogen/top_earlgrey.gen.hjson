@@ -139,6 +139,7 @@
         clocks:
         {
           clk_io_div4_peri: io_div4
+          clk_io_div2_peri: io_div2
           clk_aon_peri: aon
           clk_usb_peri: usb
         }
@@ -1178,6 +1179,7 @@
       clock_srcs:
       {
         clk_i: io_div4
+        scan_clk_i: io_div2
       }
       clock_group: peri
       reset_connections:
@@ -1188,6 +1190,7 @@
       clock_connections:
       {
         clk_i: clkmgr_aon_clocks.clk_io_div4_peri
+        scan_clk_i: clkmgr_aon_clocks.clk_io_div2_peri
       }
       domain: "0"
       size: 0x2000
@@ -3218,6 +3221,9 @@
           act: rsp
           package: jtag_pkg
           inst_name: lc_ctrl
+          width: 1
+          default: ""
+          top_signame: pinmux_aon_lc_jtag
           index: -1
         }
         {
@@ -4053,19 +4059,6 @@
           index: -1
         }
         {
-          struct: rstmgr_ast
-          type: uni
-          name: ast
-          act: rcv
-          package: rstmgr_pkg
-          inst_name: rstmgr_aon
-          width: 1
-          default: ""
-          external: true
-          top_signame: rstmgr_ast
-          index: -1
-        }
-        {
           struct: rstmgr_cpu
           type: uni
           name: cpu
@@ -4372,12 +4365,57 @@
       inter_signal_list:
       [
         {
-          struct: lc_strap
+          struct: lc_tx
+          type: uni
+          name: lc_hw_debug_en
+          act: rcv
+          default: lc_ctrl_pkg::Off
+          package: lc_ctrl_pkg
+          inst_name: pinmux_aon
+          width: 1
+          top_signame: lc_ctrl_lc_hw_debug_en
+          index: -1
+        }
+        {
+          struct: lc_tx
+          type: uni
+          name: lc_dft_en
+          act: rcv
+          default: lc_ctrl_pkg::Off
+          package: lc_ctrl_pkg
+          inst_name: pinmux_aon
+          width: 1
+          top_signame: lc_ctrl_lc_dft_en
+          index: -1
+        }
+        {
+          struct: jtag
           type: req_rsp
-          name: lc_pinmux_strap
-          act: rsp
-          package: pinmux_pkg
-          default: "'0"
+          name: lc_jtag
+          act: req
+          package: jtag_pkg
+          inst_name: pinmux_aon
+          width: 1
+          default: ""
+          end_idx: -1
+          top_signame: pinmux_aon_lc_jtag
+          index: -1
+        }
+        {
+          struct: jtag
+          type: req_rsp
+          name: rv_jtag
+          act: req
+          package: jtag_pkg
+          inst_name: pinmux_aon
+          index: -1
+        }
+        {
+          struct: jtag
+          type: req_rsp
+          name: dft_jtag
+          act: req
+          package: jtag_pkg
           inst_name: pinmux_aon
           index: -1
         }
@@ -4395,6 +4433,16 @@
           struct: logic
           type: uni
           name: sleep_en
+          act: rcv
+          package: ""
+          default: 1'b0
+          inst_name: pinmux_aon
+          index: -1
+        }
+        {
+          struct: logic
+          type: uni
+          name: strap_en
           act: rcv
           package: ""
           default: 1'b0
@@ -6259,7 +6307,7 @@
         {
           name: SBoxImpl
           type: aes_pkg::sbox_impl_e
-          default: aes_pkg::SBoxImplLut
+          default: aes_pkg::SBoxImplCanright
           desc: Selection of the S-Box implementation. See aes_pkg.sv.
           local: "false"
           expose: "true"
@@ -6459,7 +6507,7 @@
           type: interrupt
         }
         {
-          name: es_fifo_err
+          name: es_fatal_err
           width: 1
           bits: "2"
           bitinfo:
@@ -6474,7 +6522,7 @@
       alert_list:
       [
         {
-          name: recov_alert_count_met
+          name: recov_alert
           width: 1
           bits: "0"
           bitinfo:
@@ -6482,6 +6530,19 @@
             1
             1
             0
+          ]
+          type: alert
+          async: 1
+        }
+        {
+          name: fatal_alert
+          width: 1
+          bits: "1"
+          bitinfo:
+          [
+            2
+            1
+            1
           ]
           type: alert
           async: 1
@@ -6596,7 +6657,7 @@
           type: interrupt
         }
         {
-          name: edn_fifo_err
+          name: edn_fatal_err
           width: 1
           bits: "1"
           bitinfo:
@@ -6608,7 +6669,22 @@
           type: interrupt
         }
       ]
-      alert_list: []
+      alert_list:
+      [
+        {
+          name: fatal_alert
+          width: 1
+          bits: "0"
+          bitinfo:
+          [
+            1
+            1
+            0
+          ]
+          type: alert
+          async: 1
+        }
+      ]
       wakeup_list: []
       reset_request_list: []
       scan: "false"
@@ -6705,7 +6781,7 @@
           type: interrupt
         }
         {
-          name: edn_fifo_err
+          name: edn_fatal_err
           width: 1
           bits: "1"
           bitinfo:
@@ -6717,7 +6793,22 @@
           type: interrupt
         }
       ]
-      alert_list: []
+      alert_list:
+      [
+        {
+          name: fatal_alert
+          width: 1
+          bits: "0"
+          bitinfo:
+          [
+            1
+            1
+            0
+          ]
+          type: alert
+          async: 1
+        }
+      ]
       wakeup_list: []
       reset_request_list: []
       scan: "false"
@@ -6754,7 +6845,7 @@
             '''
           package: edn_pkg
           inst_name: edn1
-          end_idx: 1
+          end_idx: 2
           top_type: partial-one-to-N
           top_signame: edn1_edn
           index: -1
@@ -6958,16 +7049,19 @@
       clock_srcs:
       {
         clk_i: main
+        clk_edn_i: main
       }
       clock_group: trans
       reset_connections:
       {
         rst_ni: rstmgr_aon_resets.rst_sys_n[rstmgr_pkg::Domain0Sel]
+        rst_edn_ni: rstmgr_aon_resets.rst_sys_n[rstmgr_pkg::Domain0Sel]
       }
       base_addr: 0x411D0000
       clock_connections:
       {
         clk_i: clkmgr_aon_clocks.clk_main_otbn
+        clk_edn_i: clkmgr_aon_clocks.clk_main_otbn
       }
       domain: "0"
       size: 0x10000
@@ -7040,6 +7134,18 @@
       scan_reset: "false"
       inter_signal_list:
       [
+        {
+          struct: edn
+          type: req_rsp
+          name: edn
+          act: req
+          package: edn_pkg
+          inst_name: otbn
+          width: 1
+          default: ""
+          top_signame: edn1_edn
+          index: 1
+        }
         {
           name: idle
           type: uni
@@ -7524,6 +7630,7 @@
       edn1.edn:
       [
         alert_handler.edn
+        otbn.edn
       ]
       otp_ctrl.otp_keymgr_key:
       [
@@ -7543,6 +7650,10 @@
         hmac.idle
         kmac.idle
         otbn.idle
+      ]
+      pinmux_aon.lc_jtag:
+      [
+        lc_ctrl.jtag
       ]
       otp_ctrl.otp_lc_data:
       [
@@ -7570,6 +7681,7 @@
       lc_ctrl.lc_dft_en:
       [
         otp_ctrl.lc_dft_en
+        pinmux_aon.lc_dft_en
       ]
       lc_ctrl.lc_nvm_debug_en:
       [
@@ -7579,6 +7691,7 @@
       [
         sram_ctrl_main.lc_hw_debug_en
         sram_ctrl_ret_aon.lc_hw_debug_en
+        pinmux_aon.lc_hw_debug_en
       ]
       lc_ctrl.lc_cpu_en: []
       lc_ctrl.lc_escalate_en:
@@ -7810,7 +7923,6 @@
       clkmgr_aon.clk_usb: clk_usb
       clkmgr_aon.clk_aon: clk_aon
       clkmgr_aon.jitter_en: clk_main_jitter_en
-      rstmgr_aon.ast: rstmgr_ast
       pwrmgr_aon.pwr_ast: pwrmgr_ast
       sensor_ctrl_aon.ast_alert: sensor_ctrl_ast_alert
       sensor_ctrl_aon.ast_status: sensor_ctrl_ast_status
@@ -11085,7 +11197,7 @@
       module_name: edn0
     }
     {
-      name: edn0_edn_fifo_err
+      name: edn0_edn_fatal_err
       width: 1
       bits: "1"
       bitinfo:
@@ -11111,7 +11223,7 @@
       module_name: edn1
     }
     {
-      name: edn1_edn_fifo_err
+      name: edn1_edn_fatal_err
       width: 1
       bits: "1"
       bitinfo:
@@ -11162,7 +11274,7 @@
       module_name: entropy_src
     }
     {
-      name: entropy_src_es_fifo_err
+      name: entropy_src_es_fatal_err
       width: 1
       bits: "2"
       bitinfo:
@@ -11185,6 +11297,8 @@
     lc_ctrl
     entropy_src
     csrng
+    edn0
+    edn1
     sram_ctrl_main
     sram_ctrl_ret_aon
     flash_ctrl
@@ -11430,7 +11544,7 @@
       module_name: lc_ctrl
     }
     {
-      name: entropy_src_recov_alert_count_met
+      name: entropy_src_recov_alert
       width: 1
       bits: "0"
       bitinfo:
@@ -11438,6 +11552,20 @@
         1
         1
         0
+      ]
+      type: alert
+      async: 1
+      module_name: entropy_src
+    }
+    {
+      name: entropy_src_fatal_alert
+      width: 1
+      bits: "1"
+      bitinfo:
+      [
+        2
+        1
+        1
       ]
       type: alert
       async: 1
@@ -11456,6 +11584,34 @@
       type: alert
       async: 1
       module_name: csrng
+    }
+    {
+      name: edn0_fatal_alert
+      width: 1
+      bits: "0"
+      bitinfo:
+      [
+        1
+        1
+        0
+      ]
+      type: alert
+      async: 1
+      module_name: edn0
+    }
+    {
+      name: edn1_fatal_alert
+      width: 1
+      bits: "0"
+      bitinfo:
+      [
+        1
+        1
+        0
+      ]
+      type: alert
+      async: 1
+      module_name: edn1
     }
     {
       name: sram_ctrl_main_fatal_parity_error
@@ -12626,6 +12782,9 @@
         act: rsp
         package: jtag_pkg
         inst_name: lc_ctrl
+        width: 1
+        default: ""
+        top_signame: pinmux_aon_lc_jtag
         index: -1
       }
       {
@@ -13239,19 +13398,6 @@
         index: -1
       }
       {
-        struct: rstmgr_ast
-        type: uni
-        name: ast
-        act: rcv
-        package: rstmgr_pkg
-        inst_name: rstmgr_aon
-        width: 1
-        default: ""
-        external: true
-        top_signame: rstmgr_ast
-        index: -1
-      }
-      {
         struct: rstmgr_cpu
         type: uni
         name: cpu
@@ -13468,12 +13614,57 @@
         index: -1
       }
       {
-        struct: lc_strap
+        struct: lc_tx
+        type: uni
+        name: lc_hw_debug_en
+        act: rcv
+        default: lc_ctrl_pkg::Off
+        package: lc_ctrl_pkg
+        inst_name: pinmux_aon
+        width: 1
+        top_signame: lc_ctrl_lc_hw_debug_en
+        index: -1
+      }
+      {
+        struct: lc_tx
+        type: uni
+        name: lc_dft_en
+        act: rcv
+        default: lc_ctrl_pkg::Off
+        package: lc_ctrl_pkg
+        inst_name: pinmux_aon
+        width: 1
+        top_signame: lc_ctrl_lc_dft_en
+        index: -1
+      }
+      {
+        struct: jtag
         type: req_rsp
-        name: lc_pinmux_strap
-        act: rsp
-        package: pinmux_pkg
-        default: "'0"
+        name: lc_jtag
+        act: req
+        package: jtag_pkg
+        inst_name: pinmux_aon
+        width: 1
+        default: ""
+        end_idx: -1
+        top_signame: pinmux_aon_lc_jtag
+        index: -1
+      }
+      {
+        struct: jtag
+        type: req_rsp
+        name: rv_jtag
+        act: req
+        package: jtag_pkg
+        inst_name: pinmux_aon
+        index: -1
+      }
+      {
+        struct: jtag
+        type: req_rsp
+        name: dft_jtag
+        act: req
+        package: jtag_pkg
         inst_name: pinmux_aon
         index: -1
       }
@@ -13491,6 +13682,16 @@
         struct: logic
         type: uni
         name: sleep_en
+        act: rcv
+        package: ""
+        default: 1'b0
+        inst_name: pinmux_aon
+        index: -1
+      }
+      {
+        struct: logic
+        type: uni
+        name: strap_en
         act: rcv
         package: ""
         default: 1'b0
@@ -14394,7 +14595,7 @@
           '''
         package: edn_pkg
         inst_name: edn1
-        end_idx: 1
+        end_idx: 2
         top_type: partial-one-to-N
         top_signame: edn1_edn
         index: -1
@@ -14499,6 +14700,18 @@
         end_idx: -1
         top_signame: sram_ctrl_main_tl
         index: -1
+      }
+      {
+        struct: edn
+        type: req_rsp
+        name: edn
+        act: req
+        package: edn_pkg
+        inst_name: otbn
+        width: 1
+        default: ""
+        top_signame: edn1_edn
+        index: 1
       }
       {
         name: idle
@@ -15390,17 +15603,6 @@
         netname: clk_main_jitter_en
       }
       {
-        package: rstmgr_pkg
-        struct: rstmgr_ast
-        signame: rstmgr_ast_i
-        width: 1
-        type: uni
-        default: ""
-        direction: in
-        index: -1
-        netname: rstmgr_ast
-      }
-      {
         package: pwrmgr_pkg
         struct: pwr_ast_req
         signame: pwrmgr_ast_req_o
@@ -16124,7 +16326,7 @@
         signame: edn1_edn_req
         width: 4
         type: req_rsp
-        end_idx: 1
+        end_idx: 2
         act: rsp
         suffix: req
         default: "'0"
@@ -16135,7 +16337,7 @@
         signame: edn1_edn_rsp
         width: 4
         type: req_rsp
-        end_idx: 1
+        end_idx: 2
         act: rsp
         suffix: rsp
         default: "'0"
@@ -16193,6 +16395,28 @@
         end_idx: -1
         act: rcv
         suffix: ""
+        default: ""
+      }
+      {
+        package: jtag_pkg
+        struct: jtag_req
+        signame: pinmux_aon_lc_jtag_req
+        width: 1
+        type: req_rsp
+        end_idx: -1
+        act: req
+        suffix: req
+        default: ""
+      }
+      {
+        package: jtag_pkg
+        struct: jtag_rsp
+        signame: pinmux_aon_lc_jtag_rsp
+        width: 1
+        type: req_rsp
+        end_idx: -1
+        act: req
+        suffix: rsp
         default: ""
       }
       {

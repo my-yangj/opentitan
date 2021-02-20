@@ -11,6 +11,8 @@ filesets:
       - lowrisc:ip:jtag_pkg
       - lowrisc:ip:tlul
       - lowrisc:prim:all
+      - lowrisc:prim:lc_sync
+      - lowrisc:prim:clock_mux2
       - lowrisc:tlul:adapter_host
       - pulp-platform:riscv-dbg:0.1
       - lowrisc:ip:lc_ctrl_pkg

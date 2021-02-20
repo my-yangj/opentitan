@@ -175,14 +175,14 @@ const top_earlgrey_plic_peripheral_t
   [kTopEarlgreyPlicIrqIdCsrngCsHwInstExc] = kTopEarlgreyPlicPeripheralCsrng,
   [kTopEarlgreyPlicIrqIdCsrngCsFatalErr] = kTopEarlgreyPlicPeripheralCsrng,
   [kTopEarlgreyPlicIrqIdEdn0EdnCmdReqDone] = kTopEarlgreyPlicPeripheralEdn0,
-  [kTopEarlgreyPlicIrqIdEdn0EdnFifoErr] = kTopEarlgreyPlicPeripheralEdn0,
+  [kTopEarlgreyPlicIrqIdEdn0EdnFatalErr] = kTopEarlgreyPlicPeripheralEdn0,
   [kTopEarlgreyPlicIrqIdEdn1EdnCmdReqDone] = kTopEarlgreyPlicPeripheralEdn1,
-  [kTopEarlgreyPlicIrqIdEdn1EdnFifoErr] = kTopEarlgreyPlicPeripheralEdn1,
+  [kTopEarlgreyPlicIrqIdEdn1EdnFatalErr] = kTopEarlgreyPlicPeripheralEdn1,
   [kTopEarlgreyPlicIrqIdAonTimerAonWkupTimerExpired] = kTopEarlgreyPlicPeripheralAonTimerAon,
   [kTopEarlgreyPlicIrqIdAonTimerAonWdogTimerBark] = kTopEarlgreyPlicPeripheralAonTimerAon,
   [kTopEarlgreyPlicIrqIdEntropySrcEsEntropyValid] = kTopEarlgreyPlicPeripheralEntropySrc,
   [kTopEarlgreyPlicIrqIdEntropySrcEsHealthTestFailed] = kTopEarlgreyPlicPeripheralEntropySrc,
-  [kTopEarlgreyPlicIrqIdEntropySrcEsFifoErr] = kTopEarlgreyPlicPeripheralEntropySrc,
+  [kTopEarlgreyPlicIrqIdEntropySrcEsFatalErr] = kTopEarlgreyPlicPeripheralEntropySrc,
 };
 
 
@@ -193,7 +193,7 @@ const top_earlgrey_plic_peripheral_t
  * `top_earlgrey_alert_peripheral_t`.
  */
 const top_earlgrey_alert_peripheral_t
-    top_earlgrey_alert_for_peripheral[24] = {
+    top_earlgrey_alert_for_peripheral[27] = {
   [kTopEarlgreyAlertIdAesRecovCtrlUpdateErr] = kTopEarlgreyAlertPeripheralAes,
   [kTopEarlgreyAlertIdAesFatalFault] = kTopEarlgreyAlertPeripheralAes,
   [kTopEarlgreyAlertIdOtbnFatal] = kTopEarlgreyAlertPeripheralOtbn,
@@ -211,8 +211,11 @@ const top_earlgrey_alert_peripheral_t
   [kTopEarlgreyAlertIdOtpCtrlFatalCheckError] = kTopEarlgreyAlertPeripheralOtpCtrl,
   [kTopEarlgreyAlertIdLcCtrlFatalProgError] = kTopEarlgreyAlertPeripheralLcCtrl,
   [kTopEarlgreyAlertIdLcCtrlFatalStateError] = kTopEarlgreyAlertPeripheralLcCtrl,
-  [kTopEarlgreyAlertIdEntropySrcRecovAlertCountMet] = kTopEarlgreyAlertPeripheralEntropySrc,
+  [kTopEarlgreyAlertIdEntropySrcRecovAlert] = kTopEarlgreyAlertPeripheralEntropySrc,
+  [kTopEarlgreyAlertIdEntropySrcFatalAlert] = kTopEarlgreyAlertPeripheralEntropySrc,
   [kTopEarlgreyAlertIdCsrngFatalAlert] = kTopEarlgreyAlertPeripheralCsrng,
+  [kTopEarlgreyAlertIdEdn0FatalAlert] = kTopEarlgreyAlertPeripheralEdn0,
+  [kTopEarlgreyAlertIdEdn1FatalAlert] = kTopEarlgreyAlertPeripheralEdn1,
   [kTopEarlgreyAlertIdSramCtrlMainFatalParityError] = kTopEarlgreyAlertPeripheralSramCtrlMain,
   [kTopEarlgreyAlertIdSramCtrlRetAonFatalParityError] = kTopEarlgreyAlertPeripheralSramCtrlRetAon,
   [kTopEarlgreyAlertIdFlashCtrlRecovErr] = kTopEarlgreyAlertPeripheralFlashCtrl,
